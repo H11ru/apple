@@ -1,0 +1,54 @@
+# Apple game
+
+- its a apple game
+- generates world automatically
+- procedural genration
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+- apples
+
+- gg
