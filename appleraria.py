@@ -50,7 +50,7 @@ TILES = Tiles({
 
 camera_x, camera_y = 0, 0
 grid = np.zeros((GRID_WIDTH, GRID_HEIGHT), dtype=int)
-noise_vals = np.array([helpers.perlin(i / 50) for i in range(GRID_WIDTH)])
+noise_vals = np.array([helpers.perlin(i / 50) for i in range(GRID_WIDTH)]) ** 1.3
 
 HILL_HEIGHT = 50
 # calcialte sea level
@@ -91,7 +91,26 @@ for y in range(0, GRID_HEIGHT, 1): # Fixed: positive step size 1
 # Set camera so stone is in the vertical center of the viewport
 camera_x = center_x - VIEWPORT_WIDTH // 2
 camera_y = stone_y - VIEWPORT_HEIGHT // 2
-
+# Replace your stars initialization with:
+star_colors = [
+    (255, 255, 255),  # White
+    (255, 244, 232),  # Warm white
+    (202, 216, 255),  # Blue-white
+    (255, 204, 229),  # Pinkish
+    (255, 255, 204),  # Yellowish
+]
+stars = [
+    [
+        random.randint(0, SCREEN_WIDTH),
+        random.randint(0, SCREEN_HEIGHT),
+        random.uniform(-0.01, 0.01),
+        random.uniform(-0.01, 0.01),
+        random.choices([1, 2, 3], [0.5, 0.3, 0.2])[0],
+        random.randint(0, 60),  # twinkle timer
+        random.choice(star_colors)
+    ]
+    for _ in range(100)
+]
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Appleraria')
@@ -112,6 +131,32 @@ while True:
         camera_y -= 1
     if keys[pygame.K_DOWN]:
         camera_y += 1
+
+    screen.fill((0, 0, 0))
+    # EFficientyc featuire: only draw stars if any part of the viewport is outside the grid
+    if camera_x < 0 or camera_x + VIEWPORT_WIDTH > GRID_WIDTH or camera_y < 0 or camera_y + VIEWPORT_HEIGHT > GRID_HEIGHT:
+        # --- Draw star halos (glow) ---
+        for star in stars:
+            x, y, vx, vy, size, twinkle, color = star
+            pygame.draw.circle(screen, tuple(int(c*0.7) for c in color), (int(x), int(y)), size + 1)
+
+        # --- Draw star cores and cross shapes, update twinkle and position ---
+        for star in stars:
+            x, y, vx, vy, size, twinkle, color = star
+
+            # Twinkle: randomly change size every so often
+            if twinkle <= 0:
+                star[4] = max(1, min(3, size + random.choice([-1, 0, 1])))
+                star[5] = random.randint(10, 60)
+            else:
+                star[5] -= 1
+
+            # Draw colored core
+            pygame.draw.circle(screen, color, (int(x), int(y)), size - 1)
+
+            # Move star
+            star[0] = (x + vx) % SCREEN_WIDTH
+            star[1] = (y + vy) % SCREEN_HEIGHT
 
     # Draw grid EFFUCUENTLY (rememebr: cam pos is a floatinger)
     for x in range(VIEWPORT_WIDTH):
