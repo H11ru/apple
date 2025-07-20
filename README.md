@@ -1,6 +1,6 @@
 # Apple game
 
-- its an apple game
+- it's an apple game
 - generates world automatically
 - procedural genration
 - apples
