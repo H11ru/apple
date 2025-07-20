@@ -50,11 +50,24 @@ TILES = Tiles({
 
 camera_x, camera_y = 0, 0
 grid = np.zeros((GRID_WIDTH, GRID_HEIGHT), dtype=int)
-noise_vals = np.array([helpers.perlin(i / 50) for i in range(GRID_WIDTH)]) ** 1.3
+MOUNTAIN_FACTOR = 3
+noise_vals = (np.array([helpers.perlin(i / 100) for i in range(GRID_WIDTH)]) * MOUNTAIN_FACTOR) ** 2 / MOUNTAIN_FACTOR
+
+# Generate three noise maps:
+lake_noise = np.array([helpers.perlin(i / 40 + 200) for i in range(GRID_WIDTH)])       # Small scale, hilly
+blend_noise = np.array([helpers.perlin(i / 200 + 300) for i in range(GRID_WIDTH)])     # Very large scale
+
+# Scale and offset
+lake_height = (lake_noise) * 0.5 - 0.3    # Lower and more rolling
+
+blend = (blend_noise + 1) / 2  # Normalize to [0, 1] range
+
+# Final noise: blend between lake and mountain
+noise_vals = lake_height * (1 - blend) + noise_vals * blend
 
 HILL_HEIGHT = 50
 # calcialte sea level
-SEA_LEVEL = int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT) + (HILL_HEIGHT // 3) * 2 - 3
+SEA_LEVEL = int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT) + (HILL_HEIGHT // 3) * 2 + 6
 
 for x in range(GRID_WIDTH):
     height = int(noise_vals[x] * HILL_HEIGHT) + int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT)
@@ -168,6 +181,11 @@ while True:
                 # Draw rectangle
                 color = Tile_from_id(tile_type).color
                 pygame.draw.rect(screen, color, (x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+
+    # Debug renderers
+    if keys[pygame.K_F1]:
+        # render sea level as blue line
+        pygame.draw.line(screen, (0, 0, 255), (0, (SEA_LEVEL - camera_y) * TILE_SIZE), (SCREEN_WIDTH, (SEA_LEVEL - camera_y) * TILE_SIZE), 1)
 
     pygame.display.flip()
     clock.tick(60)
