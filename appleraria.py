@@ -22,6 +22,13 @@ class Tile:
 
     def __int__(self):
         return self.id
+    
+    def __eq__(self, other):
+        if isinstance(other, Tile):
+            return self.id == other.id
+        elif isinstance(other, int):
+            return self.id == other
+        return False
 
 class Tiles:
     def __init__(self, tile_dict):
@@ -42,6 +49,8 @@ TILES = Tiles({
     "DIRT": [2, (139, 69, 19)],
     "GRASS": [3, (34, 139, 34)],
     "WATER": [4, (15, 15, 238)],
+    "LOG": [5, (150, 75, 0)],
+    "LEAVES": [6, (0, 215, 0)],
 })
 
 
@@ -67,7 +76,7 @@ noise_vals = lake_height * (1 - blend) + noise_vals * blend
 
 HILL_HEIGHT = 50
 # calcialte sea level
-SEA_LEVEL = int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT) + (HILL_HEIGHT // 3) * 2 + 6
+SEA_LEVEL = int(GRID_HEIGHT * 0.3 - HILL_HEIGHT) + (HILL_HEIGHT // 3) * 2 + 12 # What ever this is it works for some reason and idk
 
 for x in range(GRID_WIDTH):
     height = int(noise_vals[x] * HILL_HEIGHT) + int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT)
@@ -83,6 +92,61 @@ for x in range(GRID_WIDTH):
         # Usiong NUMPY
         grid[x, SEA_LEVEL:height+1] = TILES.WATER
 
+
+tree_timer = 0
+for x in range(GRID_WIDTH):
+    tree_timer -= 1
+    # Find the highest grass tile in this column
+    for y in range(GRID_HEIGHT):
+        if grid[x, y] == TILES.GRASS:
+            if tree_timer <= 0 and random.random() < 0.2:  # 20% chance, adjust as needed
+                tree_height = random.randint(6, 9)
+                # Place trunk
+                for h in range(tree_height):
+                    if y-h-1 >= 0:
+                        grid[x, y-h-1] = TILES.LOG
+                leaf = [
+                    [0, 0.6, 1, 0.6, 0],
+                    [0.1, 0.9, 1, 0.9, 0.1],
+                    [0.6, 1, -1, 1, 0.6],
+                    [0.8, 1, 0, 1, 0.8]
+                ]
+                # NOTE: -1 is the spot where the top of the trunk is. all other values are probabilities for leaves
+                # Add leaves
+                # Add leaves
+                for dy in range(-2, 2):
+                    for dx in range(-2, 3):
+                        lx = x + dx
+                        ly = (y - tree_height) + dy
+                        if 0 <= lx < GRID_WIDTH and 0 <= ly < GRID_HEIGHT:
+                            if leaf[dy+2][dx+2] > random.random():
+                                grid[lx, ly] = TILES.LEAVES
+                # FIX FLOATING LEAVES
+                # Foe each leaf, if its not touching adjacent to another leaf or a log, remove it
+                for ly in range(y - tree_height - 2, y + 2):
+                    for lx in range(x - 2, x + 3):
+                        if 0 <= lx < GRID_WIDTH and 0 <= ly < GRID_HEIGHT:
+                            if grid[lx, ly] == TILES.LEAVES:
+                                # Check adjacent tiles
+                                has_adjacent = False
+                                for dy in range(-1, 2):
+                                    for dx in range(-1, 2):
+                                        if dx == 0 and dy == 0:
+                                            continue
+                                        ax, ay = lx + dx, ly + dy
+                                        if 0 <= ax < GRID_WIDTH and 0 <= ay < GRID_HEIGHT:
+                                            if grid[ax, ay] == TILES.LEAVES or grid[ax, ay] == TILES.LOG:
+                                                has_adjacent = True
+                                                break
+                                    if has_adjacent:
+                                        break
+                                if not has_adjacent:
+                                    grid[lx, ly] = TILES.AIR
+
+
+                tree_timer = random.randint(5, 10)
+            break  # Only one tree per column
+        
 def Tile_from_id(tile_id):
     for tile in TILES.tileinstances.values():
         if int(tile) == tile_id:
