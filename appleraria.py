@@ -36,10 +36,12 @@ class Tiles:
             return object.__getattribute__(self, name)
 
 TILES = Tiles({
+    "DEBUGBLOCK": [-1, (255, 0, 255)],
     "AIR": [0, (171, 205, 239)],
     "STONE": [1, (128, 128, 128)],
     "DIRT": [2, (139, 69, 19)],
     "GRASS": [3, (34, 139, 34)],
+    "WATER": [4, (15, 15, 238)],
 })
 
 
@@ -48,18 +50,25 @@ TILES = Tiles({
 
 camera_x, camera_y = 0, 0
 grid = np.zeros((GRID_WIDTH, GRID_HEIGHT), dtype=int)
-noise_vals = np.array([helpers.perlin(i / 15, scale=10) for i in range(GRID_WIDTH)])
+noise_vals = np.array([helpers.perlin(i / 50) for i in range(GRID_WIDTH)])
 
-HILL_HEIGHT = 20
+HILL_HEIGHT = 50
+# calcialte sea level
+SEA_LEVEL = int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT) + (HILL_HEIGHT // 3) * 2 - 3
 
 for x in range(GRID_WIDTH):
     height = int(noise_vals[x] * HILL_HEIGHT) + int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT)
-    grid[x, height:] = TILES.DIRT.id
+    grid[x, height+1:] = TILES.DIRT
     # Place stone deeeper down
-    dirt_depth = random.randint(4,5)
-    grid[x, (height + dirt_depth):] = TILES.STONE.id
-    # Grass toplayer
-    grid[x, height] = TILES.GRASS.id
+    dirt_depth = random.randint(4,5) if height < SEA_LEVEL else 3
+    grid[x, (height + dirt_depth):] = TILES.STONE
+    if height < SEA_LEVEL:
+        # Grass toplayer
+        grid[x, height] = TILES.GRASS
+    else:
+        # Fill from grass's y pos UP to sea level with water
+        # Usiong NUMPY
+        grid[x, SEA_LEVEL:height+1] = TILES.WATER
 
 def Tile_from_id(tile_id):
     for tile in TILES.tileinstances.values():

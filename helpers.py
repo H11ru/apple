@@ -21,18 +21,18 @@ def fade_cached(t):
     t = round(t, 6)
     return 6*t**5 - 15*t**4 + 10*t**3
 
-def perlin(x, scale=10):
+def perlin(x, scale=1):
     """
     Returns 1D Perlin-like noise value at position x.
     Args:
         x (float): Position on the noise line.
-        scale (int): Number of gradients (controls smoothness).
+        scale (int): Scale of the noise.
     Returns:
-        float: Noise value in range [0, 1].
+        float: Noise value in range [0, scale].
     """
-    gradients = get_gradients(scale)
-    x0 = int(np.floor(x)) % scale
-    x1 = (x0 + 1) % scale
+    gradients = get_gradients(5)
+    x0 = int(np.floor(x)) % 5
+    x1 = (x0 + 1) % 5
     t = x - np.floor(x)
 
     fade_t = fade_cached(t)
@@ -49,4 +49,4 @@ def perlin(x, scale=10):
     noise = lerp(n0, n1, fade_t)
     # Normalize from [-1,1] to [0,1]
     noise = (noise + 1) / 2
-    return noise
+    return noise * scale
