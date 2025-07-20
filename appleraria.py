@@ -38,6 +38,8 @@ class Tiles:
 TILES = Tiles({
     "AIR": [0, (171, 205, 239)],
     "STONE": [1, (128, 128, 128)],
+    "DIRT": [2, (139, 69, 19)],
+    "GRASS": [3, (34, 139, 34)],
 })
 
 
@@ -52,7 +54,12 @@ HILL_HEIGHT = 20
 
 for x in range(GRID_WIDTH):
     height = int(noise_vals[x] * HILL_HEIGHT) + int(SCREEN_HEIGHT * 0.2 - HILL_HEIGHT)
-    grid[x, height:] = TILES.STONE.id
+    grid[x, height:] = TILES.DIRT.id
+    # Place stone deeeper down
+    dirt_depth = random.randint(4,5)
+    grid[x, (height + dirt_depth):] = TILES.STONE.id
+    # Grass toplayer
+    grid[x, height] = TILES.GRASS.id
 
 def Tile_from_id(tile_id):
     for tile in TILES.tileinstances.values():
