@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-import pygame
+import pygame # sped
 import sys
 import numpy as np
 import helpers
@@ -155,11 +155,16 @@ for x in range(GRID_WIDTH):
                 tree_timer = random.randint(5, 10)
             break  # Only one tree per column
         
+speed = {} # IUse a DICT
+# Put stuff in dict to maek tile by id faster
+for tile_name, tile in TILES.tileinstances.items():
+    speed[tile.id] = tile
+
 def Tile_from_id(tile_id):
-    for tile in TILES.tileinstances.values():
-        if int(tile) == tile_id:
-            return tile
-    raise ValueError(f"Tile with id {tile_id} not found")
+    # This is being called likea  million times in 20 seconds so we have to optimize it a lot
+    # Linear searcH? who is this guy?
+    # we need to use speed
+    return speed.get(tile_id)
 def Tile_from_name(tile_name):
     if tile_name in TILES.tileinstances:
         return TILES.tileinstances[tile_name]
@@ -328,7 +333,19 @@ drops = {
     TILES.LEAVES: {ITEMS.APPLE: [{"chance": 0.1, "count": 1}]}, # 10% chance to drop an apple
 }
 
-
+rotateflip_grid = np.random.randint(0, 16, size=(GRID_WIDTH, GRID_HEIGHT), dtype=np.uint8)
+# 4 bits: [rotate(2 bits)][flipx][flipy]
+rotateflip_data = {
+    # Allow flipping (0 = no, 1 = X only, 2 = Y only, 3 = yes), Allow rotation (0 = no, 1 = only 180, 2 = all)
+    TILES.DEBUGBLOCK: [0, 0],
+    TILES.AIR: [0, 0],
+    TILES.STONE: [3, 2],
+    TILES.DIRT: [3, 2],
+    TILES.GRASS: [1, 0], # It has a grassy top, so we cant rotate it or flip it on Y asi t would move the grassy top
+    TILES.LOG: [3, 1], # Logs have top to bototm lines. we can onyl flip or rotate 180, 90 would misalign the lines.
+    TILES.LEAVES: [3, 2],
+    TILES.WATER: [3, 0], # Wave pattern
+}
 
 import os
 
@@ -360,6 +377,42 @@ for item in ITEMS.iteminstances.values():
 # Player texture (example, you can customize)
 player_texture = load_texture("player", (255, 0, 0), TILE_SIZE * PLAYER_WIDTH, override=TILE_SIZE * PLAYER_HEIGHT)
 
+
+# ...existing code...
+
+# Precompute all needed flip/rotate variants for each tile type
+precomputed_tile_variants = {}
+
+for tile in TILES.tileinstances.values():
+    if tile in rotateflip_data:
+        allow_flip, allow_rotate = rotateflip_data[tile]
+        variants = {}
+        # Possible rotations
+        rot_options = [0]
+        if allow_rotate == 1:
+            rot_options = [0, 180]
+        elif allow_rotate == 2:
+            rot_options = [0, 90, 180, 270]
+        # Possible flips
+        flip_options = [(False, False)]
+        if allow_flip == 1:
+            flip_options = [(False, False), (True, False)]
+        elif allow_flip == 2:
+            flip_options = [(False, False), (False, True)]
+        elif allow_flip == 3:
+            flip_options = [(False, False), (True, False), (False, True), (True, True)]
+        # Generate all needed combinations
+        for rot in rot_options:
+            for flipx, flipy in flip_options:
+                key = (rot, flipx, flipy)
+                tex = tile_textures[tile.id]
+                tex2 = pygame.transform.flip(tex, flipx, flipy)
+                if rot:
+                    tex2 = pygame.transform.rotate(tex2, rot)
+                variants[key] = tex2
+        precomputed_tile_variants[tile.id] = variants
+
+# ...existing code...
 
 
 f3 = False
@@ -548,6 +601,7 @@ while True:
     
     # --- Replace grid drawing ---
     # We use a different surface because for whatever reason drawing anything onto the pygame.display.set_mode is super slow but Surfaces are fast. WHY??????????????????
+
     oscreen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     for x in range(VIEWPORT_WIDTH+1):
         for y in range(VIEWPORT_HEIGHT+1):
@@ -557,8 +611,41 @@ while True:
                 tile_id = grid[gx, gy]
                 tex = tile_textures.get(tile_id)
                 if tex:
+                    # Get allowed flip/rotate from rotateflip_data
+                    tile_obj = Tile_from_id(tile_id)
+                    if tile_obj in rotateflip_data:
+                        #print("rules for the tile: " + ({0: "cannot rotate", 1: "180 only", 2: "any rotation"}[rotateflip_data[tile_id]]) + ", " + {0: "cannot flip", 1: "flip X", 2: "flip Y", 3: "flip both"}[rotateflip_data[tile_id][0]])
+                        allow_flip, allow_rotate = rotateflip_data[tile_obj]
+                        rf = rotateflip_grid[gx, gy]
+                        # Rotation
+                        rot = 0
+                        if allow_rotate == 1:
+                            # Only allow 180 degree rotation
+                            if (rf >> 2) & 0b01:
+                                rot = 180
+                        elif allow_rotate == 2:
+                            # Allow 0, 90, 180, 270
+                            rot = ((rf >> 2) & 0b11) * 90
+                        # Flip
+                        flipx = False
+                        flipy = False
+                        if allow_flip == 1:
+                            flipx = bool(rf & 0b0010)
+                        elif allow_flip == 2:
+                            flipy = bool(rf & 0b0001)
+                        elif allow_flip == 3:
+                            flipx = bool(rf & 0b0010)
+                            flipy = bool(rf & 0b0001)
+                        # Apply transforms
+                        """tex2 = pygame.transform.flip(tex, flipx, flipy)
+                        if rot:
+                            tex2 = pygame.transform.rotate(tex2, rot)"""
+                        tex2 = precomputed_tile_variants[tile_id].get((rot, flipx, flipy), tex)
+                    else:
+                        tex2 = tex
+                        #print("no rules found for tile of type " + str(tile_id))
                     oscreen.blit(
-                        tex,
+                        tex2,
                         (
                             int(x * TILE_SIZE - (camera_x % 1) * TILE_SIZE),
                             int(y * TILE_SIZE - (camera_y % 1) * TILE_SIZE)
