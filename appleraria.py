@@ -332,17 +332,18 @@ drops = {
 
 import os
 
-def load_texture(name, fallback_color, size):
+def load_texture(name, fallback_color, size, override=None):
+
     filename = f"{name}.png"
     if os.path.exists(filename):
         try:
             img = pygame.image.load(filename).convert_alpha()
-            img = pygame.transform.scale(img, (size, size))
+            img = pygame.transform.scale(img, (size, size if override is None else override))
             return img
         except Exception as e:
             print(f"[WARN] Failed to load {filename}: {e}")
     print(f"[WARN] Texture '{filename}' not found, using solid color.")
-    surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    surf = pygame.Surface((size, size if override is None else override), pygame.SRCALPHA)
     surf.fill(fallback_color)
     return surf
 
@@ -357,7 +358,7 @@ for item in ITEMS.iteminstances.values():
     item_textures[item.id] = load_texture(texname, (200, 200, 200), TILE_SIZE)
 
 # Player texture (example, you can customize)
-player_texture = load_texture("player", (255, 0, 0), TILE_SIZE * PLAYER_WIDTH)
+player_texture = load_texture("player", (255, 0, 0), TILE_SIZE * PLAYER_WIDTH, override=TILE_SIZE * PLAYER_HEIGHT)
 
 
 
