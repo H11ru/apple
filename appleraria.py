@@ -330,7 +330,34 @@ drops = {
 
 
 
+import os
 
+def load_texture(name, fallback_color, size):
+    filename = f"{name}.png"
+    if os.path.exists(filename):
+        try:
+            img = pygame.image.load(filename).convert_alpha()
+            img = pygame.transform.scale(img, (size, size))
+            return img
+        except Exception as e:
+            print(f"[WARN] Failed to load {filename}: {e}")
+    print(f"[WARN] Texture '{filename}' not found, using solid color.")
+    surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    surf.fill(fallback_color)
+    return surf
+
+tile_textures = {}
+for tile in TILES.tileinstances.values():
+    texname = f"tile_{tile.name.lower()}"
+    tile_textures[tile.id] = load_texture(texname, tile.color, TILE_SIZE)
+
+item_textures = {}
+for item in ITEMS.iteminstances.values():
+    texname = f"item_{item.name.lower()}"
+    item_textures[item.id] = load_texture(texname, (200, 200, 200), TILE_SIZE)
+
+# Player texture (example, you can customize)
+player_texture = load_texture("player", (255, 0, 0), TILE_SIZE * PLAYER_WIDTH)
 
 
 
@@ -517,36 +544,28 @@ while True:
             star[1] = (y + vy) % SCREEN_HEIGHT
 
     # Draw grid EFFUCUENTLY (rememebr: cam pos is a floatinger so we need to NOT use int(), as if you walk half a block they should be ofset)
+    
+    # --- Replace grid drawing ---
+    # We use a different surface because for whatever reason drawing anything onto the pygame.display.set_mode is super slow but Surfaces are fast. WHY??????????????????
+    oscreen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     for x in range(VIEWPORT_WIDTH+1):
         for y in range(VIEWPORT_HEIGHT+1):
-            if 0 <= camera_x + x < GRID_WIDTH and 0 <= camera_y + y < GRID_HEIGHT:
-                # NO int() ALLOWED. WE DONT WANT TO ROUND IT
-                tile_id = grid[int(camera_x + x), int(camera_y + y)]
-                tile = Tile_from_id(tile_id)
-                pygame.draw.rect(
-                    screen,
-                    tile.color if not keys[pygame.K_F5] else ((255, 0, 0) if tile.solid else (0, 255, 0)),
-                    (
-                        int(x * TILE_SIZE - (camera_x % 1) * TILE_SIZE),
-                        int(y * TILE_SIZE - (camera_y % 1) * TILE_SIZE),
-                        TILE_SIZE,
-                        TILE_SIZE
-                    )
-                )
-                if keys[pygame.K_F2]:
-                    # DRAW TYELLOW SQURE IF UPDATE
-                    if (int(camera_x + x), int(camera_y + y)) in update:
-                        pygame.draw.rect(
-                            screen,
-                            (255, 255, 0),
-                            (
-                                int(x * TILE_SIZE - (camera_x % 1) * TILE_SIZE),
-                                int(y * TILE_SIZE - (camera_y % 1) * TILE_SIZE),
-                                TILE_SIZE,
-                                TILE_SIZE
-                            ),
-                            1
+            gx = int(camera_x + x)
+            gy = int(camera_y + y)
+            if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+                tile_id = grid[gx, gy]
+                tex = tile_textures.get(tile_id)
+                if tex:
+                    oscreen.blit(
+                        tex,
+                        (
+                            int(x * TILE_SIZE - (camera_x % 1) * TILE_SIZE),
+                            int(y * TILE_SIZE - (camera_y % 1) * TILE_SIZE)
                         )
+                    )
+    screen.blit(oscreen, (0, 0))
+
+
                 
     # Debug renderers
     if keys[pygame.K_F1]:
@@ -555,14 +574,13 @@ while True:
 
     # Draw player
         # Draw player sprite (use PLAYER_WIDTH/HEIGHT for size, but not for position)
-    pygame.draw.rect(
-        screen,
-        (255, 0, 0) if not keys[pygame.K_F5] else (0, 0, 255),
+
+    # --- Replace player drawing ---
+    screen.blit(
+        player_texture,
         (
             int((player_x - camera_x) * TILE_SIZE),
-            int((player_y - camera_y) * TILE_SIZE),
-            int(TILE_SIZE * PLAYER_WIDTH),
-            int(TILE_SIZE * PLAYER_HEIGHT)
+            int((player_y - camera_y) * TILE_SIZE)
         )
     )
 
