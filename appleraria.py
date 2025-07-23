@@ -543,7 +543,7 @@ while True:
                 break
             player_x = test_x
             step += 0.05 if player_vx > 0 else -0.05
-    print(deltarune)
+    #print(deltarune)
 
 
     # --- Gravity and jumping ---
