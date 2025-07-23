@@ -55,6 +55,8 @@ TILES = Tiles({
     "WATER": [4, (15, 15, 238), 0],
     "LOG": [5, (150, 75, 0), 0],
     "LEAVES": [6, (0, 215, 0), 0],
+    "LOGSTUMP_LEFT": [7, (150, 75, 0), 0],
+    "LOGSTUMP_RIGHT": [8, (150, 75, 0), 0],
 })
 
 
@@ -97,7 +99,16 @@ for x in range(GRID_WIDTH):
         grid[x, SEA_LEVEL:height+1] = TILES.WATER
 
 PLAYER_COLLISION_WIDTH = 1.8
+speed = {} # IUse a DICT
+# Put stuff in dict to maek tile by id faster
+for tile_name, tile in TILES.tileinstances.items():
+    speed[tile.id] = tile
 PLAYER_COLLISION_HEIGHT = 2.8
+def Tile_from_id(tile_id):
+    # This is being called likea  million times in 20 seconds so we have to optimize it a lot
+    # Linear searcH? who is this guy?
+    # we need to use speed
+    return speed.get(tile_id)
 PLAYER_WIDTH = 2
 PLAYER_HEIGHT = 3
 
@@ -113,6 +124,14 @@ for x in range(GRID_WIDTH):
                 for h in range(tree_height):
                     if y-h-1 >= 0:
                         grid[x, y-h-1] = TILES.LOG
+                # place stump
+                # 1. left
+                # tree base is at (x, y)
+                if x - 1 >= 0 and grid[x - 1, y - tree_height] == TILES.AIR and Tile_from_id(grid[x - 1, y - tree_height + 1]).solid:
+                    grid[x - 1, y - tree_height] = TILES.LOGSTUMP_LEFT
+                # 2. right
+                if x + 1 < GRID_WIDTH and grid[x + 1, y - tree_height] == TILES.AIR and Tile_from_id(grid[x + 1, y - tree_height + 1]).solid:
+                    grid[x + 1, y - tree_height] = TILES.LOGSTUMP_RIGHT
                 leaf = [
                     [0, 0.6, 1, 0.6, 0],
                     [0.1, 0.9, 1, 0.9, 0.1],
@@ -155,16 +174,7 @@ for x in range(GRID_WIDTH):
                 tree_timer = random.randint(5, 10)
             break  # Only one tree per column
         
-speed = {} # IUse a DICT
-# Put stuff in dict to maek tile by id faster
-for tile_name, tile in TILES.tileinstances.items():
-    speed[tile.id] = tile
 
-def Tile_from_id(tile_id):
-    # This is being called likea  million times in 20 seconds so we have to optimize it a lot
-    # Linear searcH? who is this guy?
-    # we need to use speed
-    return speed.get(tile_id)
 def Tile_from_name(tile_name):
     if tile_name in TILES.tileinstances:
         return TILES.tileinstances[tile_name]
@@ -339,7 +349,7 @@ rotateflip_data = {
     # Allow flipping (0 = no, 1 = X only, 2 = Y only, 3 = yes), Allow rotation (0 = no, 1 = only 180, 2 = all)
     TILES.DEBUGBLOCK: [0, 0],
     TILES.AIR: [0, 0],
-    TILES.STONE: [3, 2],
+    TILES.STONE: [3, 1],
     TILES.DIRT: [3, 2],
     TILES.GRASS: [1, 0], # It has a grassy top, so we cant rotate it or flip it on Y asi t would move the grassy top
     TILES.LOG: [3, 1], # Logs have top to bototm lines. we can onyl flip or rotate 180, 90 would misalign the lines.
@@ -349,7 +359,7 @@ rotateflip_data = {
 
 import os
 
-def load_texture(name, fallback_color, size, override=None):
+def load_texture(name, fallback_color, size, override=None, stfu=False):
 
     filename = f"{name}.png"
     if os.path.exists(filename):
@@ -358,8 +368,8 @@ def load_texture(name, fallback_color, size, override=None):
             img = pygame.transform.scale(img, (size, size if override is None else override))
             return img
         except Exception as e:
-            print(f"[WARN] Failed to load {filename}: {e}")
-    print(f"[WARN] Texture '{filename}' not found, using solid color.")
+            print(f"[WARN] Failed to load {filename}: {e}") if not stfu else None
+    print(f"[WARN] Texture '{filename}' not found, using solid color.") if not stfu else None
     surf = pygame.Surface((size, size if override is None else override), pygame.SRCALPHA)
     surf.fill(fallback_color)
     return surf
@@ -367,7 +377,7 @@ def load_texture(name, fallback_color, size, override=None):
 tile_textures = {}
 for tile in TILES.tileinstances.values():
     texname = f"tile_{tile.name.lower()}"
-    tile_textures[tile.id] = load_texture(texname, tile.color, TILE_SIZE)
+    tile_textures[tile.id] = load_texture(texname, tile.color, TILE_SIZE, stfu=True if texname == "tile_air" else False)
 
 item_textures = {}
 for item in ITEMS.iteminstances.values():
@@ -414,6 +424,7 @@ for tile in TILES.tileinstances.values():
 
 # ...existing code...
 
+oscreen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 f3 = False
 commandconsole = False
@@ -502,13 +513,13 @@ while True:
                     grid[x + 1, y] = TILES.WATER"""
     
     # UPDATES
-    new_updates = []
-    random.shuffle(update)
-    for x, y in update:
-        tile_id = grid[x, y]
+    #new_updates = []
+    #random.shuffle(update)
+    #for x, y in update:
+    #    pass#;tile_id = grid[x, y]
 
                 
-    update = new_updates
+    #update = new_updates
                     
             
     # --- Horizontal movement and wall collision ---
@@ -573,36 +584,12 @@ while True:
 
     screen.fill((0, 0, 0))
     # EFficientyc featuire: only draw stars if any part of the viewport is outside the grid
-    if camera_x < 0 or camera_x + VIEWPORT_WIDTH > GRID_WIDTH or camera_y < 0 or camera_y + VIEWPORT_HEIGHT > GRID_HEIGHT:
-        # --- Draw star halos (glow) ---
-        for star in stars:
-            x, y, vx, vy, size, twinkle, color = star
-            pygame.draw.circle(screen, tuple(int(c*0.7) for c in color), (int(x), int(y)), size + 1)
-
-        # --- Draw star cores and cross shapes, update twinkle and position ---
-        for star in stars:
-            x, y, vx, vy, size, twinkle, color = star
-
-            # Twinkle: randomly change size every so often
-            if twinkle <= 0:
-                star[4] = max(1, min(3, size + random.choice([-1, 0, 1])))
-                star[5] = random.randint(10, 60)
-            else:
-                star[5] -= 1
-
-            # Draw colored core
-            pygame.draw.circle(screen, color, (int(x), int(y)), size - 1)
-
-            # Move star
-            star[0] = (x + vx) % SCREEN_WIDTH
-            star[1] = (y + vy) % SCREEN_HEIGHT
 
     # Draw grid EFFUCUENTLY (rememebr: cam pos is a floatinger so we need to NOT use int(), as if you walk half a block they should be ofset)
     
     # --- Replace grid drawing ---
     # We use a different surface because for whatever reason drawing anything onto the pygame.display.set_mode is super slow but Surfaces are fast. WHY??????????????????
 
-    oscreen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     for x in range(VIEWPORT_WIDTH+1):
         for y in range(VIEWPORT_HEIGHT+1):
             gx = int(camera_x + x)
