@@ -216,7 +216,7 @@ stars = [
 pygame.init()
 player_vx = 0
 player_vy = 0
-update = [] # (x, y)
+update = {(1,1)} # (x, y)
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Appleraria')
 pygame.display.set_icon(pygame.image.load("icon.png")) # Apple icon!!!
@@ -253,7 +253,7 @@ def player_collides_at(x, y):
 # At start,u pdate everything
 for x in range(GRID_WIDTH):
     for y in range(GRID_HEIGHT):
-        update.append((x, y))
+        update.add((x, y))
 
 class Item:
     def __init__(self, name, id, count=1):
@@ -429,6 +429,7 @@ oscreen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
 f3 = False
 commandconsole = False
 input_text = ""
+deltarune = 1
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -477,9 +478,8 @@ while True:
         tile_x = int(camera_x + mouse_x / TILE_SIZE)
         tile_y = int(camera_y + mouse_y / TILE_SIZE)
         if 0 <= tile_x < GRID_WIDTH and 0 <= tile_y < GRID_HEIGHT:
-            tile_id = grid[tile_x, tile_y]
+            tile_id = (tile:=grid[tile_x, tile_y])
             if tile_id != TILES.AIR and tile_id != TILES.DEBUGBLOCK:
-                tile = Tile_from_id(tile_id)
                 # Get drops for this tile
                 if tile in drops:
                     for item, tables in drops[tile].items():
@@ -494,7 +494,7 @@ while True:
                         nx, ny = tile_x + dx, tile_y + dy
                         if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
                             if (nx, ny) not in update:
-                                update.append((nx, ny))
+                                update.add((nx, ny))
 
 
 
@@ -520,6 +520,7 @@ while True:
 
                 
     #update = new_updates
+    update.clear()  # Reset update list for next frame
                     
             
     # --- Horizontal movement and wall collision ---
@@ -529,7 +530,7 @@ while True:
         player_vx += 0.1
 
     
-    next_x = player_x + player_vx
+    next_x = player_x + player_vx * deltarune 
     # Horizontal collision using collision box
     if not player_collides_at(next_x, player_y):
         player_x = next_x
@@ -542,10 +543,15 @@ while True:
                 break
             player_x = test_x
             step += 0.05 if player_vx > 0 else -0.05
+    print(deltarune)
 
 
     # --- Gravity and jumping ---
-    player_vy = (player_vy + 0.05) * 0.95  # Gravity and air friction
+    gravity = 0.05
+    air_friction = 0.95
+    player_vy += gravity * deltarune  # Gravity
+    player_vy *= air_friction ** deltarune  # Friction scaled by deltatime
+
 
     # --- Vertical movement ---
     next_y = player_y + player_vy
@@ -595,11 +601,11 @@ while True:
             gx = int(camera_x + x)
             gy = int(camera_y + y)
             if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                tile_id = grid[gx, gy]
+                tile_id = (tile_obj:=grid[gx, gy])
                 tex = tile_textures.get(tile_id)
                 if tex:
                     # Get allowed flip/rotate from rotateflip_data
-                    tile_obj = Tile_from_id(tile_id)
+                    
                     if tile_obj in rotateflip_data:
                         #print("rules for the tile: " + ({0: "cannot rotate", 1: "180 only", 2: "any rotation"}[rotateflip_data[tile_id]]) + ", " + {0: "cannot flip", 1: "flip X", 2: "flip Y", 3: "flip both"}[rotateflip_data[tile_id][0]])
                         allow_flip, allow_rotate = rotateflip_data[tile_obj]
@@ -682,6 +688,10 @@ while True:
         font = pygame.font.Font(None, 24)
         input_surface = font.render(input_text, True, (255, 255, 255))
         screen.blit(input_surface, (10, SCREEN_HEIGHT-40))
+
+
+    deltarune = 60 / clock.get_fps() if clock.get_fps() > 0 else 60 # deltatime
+    deltarune /= 2
 
     pygame.display.flip()
     clock.tick(60)
