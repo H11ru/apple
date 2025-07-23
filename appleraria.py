@@ -256,20 +256,21 @@ for x in range(GRID_WIDTH):
         update.add((x, y))
 
 class Item:
-    def __init__(self, name, id, count=1):
+    def __init__(self, name, id, *bleh, **blah):
         self.name = name
         self.id = id
-        self.count = count
+        if "count" in blah or "count" in bleh:
+            raise DeprecationWarning("Item count is gone")
 
     def __repr__(self):
-        return f"Item(name={self.name}, tile_id={self.tile_id}, count={self.count})"
+        return f"Item(name={self.name}, id={self.id})"
 
     def __eq__(self, other):
-        return isinstance(other, Item) and self.name == other.name and self.id == other.id and self.count == other.count
+        return isinstance(other, Item) and self.name == other.name and self.id == other.id
     
     def __hash__(self):
         # must be a hashable type for dicts
-        return hash((self.name, self.id, self.count))
+        return hash((self.name, self.id))
 
 class Inventory:
     def __init__(self):
@@ -278,8 +279,7 @@ class Inventory:
     def add_item(self, item, count=1):
         if isinstance(item, Tile):
             item = Item(name=item.name,
-                        id=int(item) + 10000, # Block ids start at 10000, non blocks at 0.
-                        count=count)
+                        id=int(item) + 10000)
         if item in self.items:
             self.items[item] += count
         else:
@@ -324,7 +324,7 @@ class Items:
     # Tiles style but for ITEMS instead
     def __init__(self, item_dict):
         # Convert all items to Item instances
-        self.iteminstances = {name: Item(name, id, count) if confirm == name else AAAA(item_dict, name, id, count, confirm) for name, (confirm, id, count) in item_dict.items()}
+        self.iteminstances = {name: Item(name, id) if confirm == name else AAAA(item_dict, name, id, trash, confirm) for name, (confirm, id, trash) in item_dict.items()}
     def __getattribute__(self, name):
         if name == 'iteminstances':
             return object.__getattribute__(self, 'iteminstances')
@@ -480,12 +480,16 @@ while True:
         if 0 <= tile_x < GRID_WIDTH and 0 <= tile_y < GRID_HEIGHT:
             tile_id = (tile:=grid[tile_x, tile_y])
             if tile_id != TILES.AIR and tile_id != TILES.DEBUGBLOCK:
+                #print(f"You whacked a {Tile_from_id(tile).name} at ({tile_x}, {tile_y})")
+                #print("driosO: " + str(drops.get(Tile_from_id(tile), {})))
                 # Get drops for this tile
-                if tile in drops:
-                    for item, tables in drops[tile].items():
+                if Tile_from_id(tile) in drops:
+                    for item, tables in drops[Tile_from_id(tile)].items():
                         for drop in tables:
+                            #print("drop: " + str(drop))
                             if random.random() < drop["chance"]:
                                 inventory.add_item(item, drop["count"])
+                                #print(f"Inserter: Added item: {item.name} x{drop['count']}")
                 # Remove tile from grid
                 grid[tile_x, tile_y] = TILES.AIR
                 # Add surrounding tiles to update list
@@ -680,7 +684,8 @@ while True:
         y_vel_text = font.render(f"VEL: {ROUNDE_player_vx:.2f}, {ROUNDE_player_vy:.2f}", True, (255, 255, 255))
         screen.blit(y_vel_text, (10, 50))
         # INVENJTORIUM
-        inventory_text = font.render(f"Inventory: {', '.join(f'{item.name} x{count}' for item, count in inventory.get_all_items().items())}", True, (255, 255, 255))
+        # Draw inventory liek this: Inventory: A x1, B x2, C x3
+        inventory_text = font.render(f"Inventory: " + ", ".join(f"{item.name} x{count}" for item, count in inventory.get_all_items().items()), True, (255, 255, 255))
         screen.blit(inventory_text, (10, 70))
 
     if commandconsole:
