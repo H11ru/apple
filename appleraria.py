@@ -478,13 +478,13 @@ while True:
         tile_x = int(camera_x + mouse_x / TILE_SIZE)
         tile_y = int(camera_y + mouse_y / TILE_SIZE)
         if 0 <= tile_x < GRID_WIDTH and 0 <= tile_y < GRID_HEIGHT:
-            tile_id = (tile:=grid[tile_x, tile_y])
+            tile_id = grid[tile_x, tile_y]
             if tile_id != TILES.AIR and tile_id != TILES.DEBUGBLOCK:
                 #print(f"You whacked a {Tile_from_id(tile).name} at ({tile_x}, {tile_y})")
                 #print("driosO: " + str(drops.get(Tile_from_id(tile), {})))
                 # Get drops for this tile
-                if Tile_from_id(tile) in drops:
-                    for item, tables in drops[Tile_from_id(tile)].items():
+                if Tile_from_id(tile_id) in drops:
+                    for item, tables in drops[Tile_from_id(tile_id)].items():
                         for drop in tables:
                             #print("drop: " + str(drop))
                             if random.random() < drop["chance"]:
