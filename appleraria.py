@@ -127,11 +127,13 @@ for x in range(GRID_WIDTH):
                 # place stump
                 # 1. left
                 # tree base is at (x, y)
-                if x - 1 >= 0 and grid[x - 1, y - tree_height] == TILES.AIR and Tile_from_id(grid[x - 1, y - tree_height + 1]).solid:
-                    grid[x - 1, y - tree_height] = TILES.LOGSTUMP_LEFT
+                y -= 1
+                if random.random() < 0.6 and x - 1 >= 0 and grid[x - 1, y] == TILES.AIR and Tile_from_id(grid[x - 1, y + 1]).solid:
+                    grid[x - 1, y] = TILES.LOGSTUMP_LEFT
                 # 2. right
-                if x + 1 < GRID_WIDTH and grid[x + 1, y - tree_height] == TILES.AIR and Tile_from_id(grid[x + 1, y - tree_height + 1]).solid:
-                    grid[x + 1, y - tree_height] = TILES.LOGSTUMP_RIGHT
+                if random.random() < 0.6 and  x + 1 < GRID_WIDTH and grid[x + 1, y] == TILES.AIR and Tile_from_id(grid[x + 1, y + 1]).solid:
+                    grid[x + 1, y] = TILES.LOGSTUMP_RIGHT
+                y += 1
                 leaf = [
                     [0, 0.6, 1, 0.6, 0],
                     [0.1, 0.9, 1, 0.9, 0.1],
@@ -447,23 +449,26 @@ while True:
                 if event.key == pygame.K_BACKSPACE:
                     input_text = input_text[:-1]
                 elif event.key == pygame.K_RETURN:
-                    # Process command
-                    if input_text == "h":
-                        player_x = GRID_WIDTH // 2
-                        player_y = 0
-                    elif input_text == "b":
-                        player_vy = -15
-                    elif input_text == "s":
-                        hgrid = np.random.choice([int(t) for t in TILES.tileinstances.values()], size=(GRID_WIDTH, GRID_HEIGHT))
-                        # Randomly interleave grid and hgrid (50% chance)
-                        for x in range(GRID_WIDTH):
-                            for y in range(GRID_HEIGHT):
-                                if random.random() < 0.2:
-                                    grid[x, y] = hgrid[x, y]
-                                elif random.random() < 0.2:
-                                    grid[x, y] = TILES.AIR
-                                elif random.random() < 0.6:
-                                    grid[x, y] = grid[x, y-1] if not grid[x, y-1] == TILES.AIR else TILES.WATER
+                    if input_text.strip():
+                        # Process command
+                        if input_text == "h":
+                            player_x = GRID_WIDTH // 2
+                            player_y = 0
+                        elif input_text == "b":
+                            player_vy = -15
+                        elif input_text == "s":
+                            hgrid = np.random.choice([int(t) for t in TILES.tileinstances.values()], size=(GRID_WIDTH, GRID_HEIGHT))
+                            # Randomly interleave grid and hgrid (50% chance)
+                            for x in range(GRID_WIDTH):
+                                for y in range(GRID_HEIGHT):
+                                    if random.random() < 0.2:
+                                        grid[x, y] = hgrid[x, y]
+                                    elif random.random() < 0.2:
+                                        grid[x, y] = TILES.AIR
+                                    elif random.random() < 0.6:
+                                        grid[x, y] = grid[x, y-1] if not grid[x, y-1] == TILES.AIR else TILES.WATER
+                        commandconsole = False
+                        input_text = ""
                 else:
                     input_text += event.unicode
 
@@ -571,9 +576,9 @@ while True:
                 break
             player_y = test_y
             step += 0.05 if player_vy > 0 else -0.05
-        player_vy = 0
         if player_vy > 0:
             on_ground = True
+        player_vy = 0
 
     # --- Jumping (only if on ground) ---
     if (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]) and abs(player_vy) < 0.2:
