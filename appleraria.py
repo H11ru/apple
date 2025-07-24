@@ -58,6 +58,7 @@ TILES = Tiles({
     "LOGSTUMP_LEFT": [7, (150, 75, 0), 0],
     "LOGSTUMP_RIGHT": [8, (150, 75, 0), 0],
 })
+static_tiles = ["AIR", "DEBUGBLOCK", "STONE", "DIRT"] # Dont need any updates
 
 
 
@@ -252,10 +253,10 @@ def player_collides_at(x, y):
 
     return any(is_solid_at(px, py) for px, py in points)
 
-# At start,u pdate everything
-for x in range(GRID_WIDTH):
-    for y in range(GRID_HEIGHT):
-        update.add((x, y))
+# At start,u pdate everything tjat isnt static
+# use niumpy to speed up
+# So, loop over all tiles and f they are not static, add them to the update set
+
 
 class Item:
     def __init__(self, name, id, *bleh, **blah):
@@ -273,6 +274,8 @@ class Item:
     def __hash__(self):
         # must be a hashable type for dicts
         return hash((self.name, self.id))
+
+GROWABLE_TILES = {TILES.GRASS, TILES.DIRT} # Soil
 
 class Inventory:
     def __init__(self):
@@ -356,12 +359,22 @@ rotateflip_data = {
     TILES.GRASS: [1, 0], # It has a grassy top, so we cant rotate it or flip it on Y asi t would move the grassy top
     TILES.LOG: [3, 1], # Logs have top to bototm lines. we can onyl flip or rotate 180, 90 would misalign the lines.
     TILES.LEAVES: [3, 2],
-    TILES.WATER: [3, 0], # Wave pattern
+    TILES.WATER: [3, 1], # Wave pattern
 }
+
 
 import os
 
-def load_texture(name, fallback_color, size, override=None, stfu=False):
+def load_texture(name, fallback_color, size, override=None, stfu=False, override_override=False):
+    if name == "tile_debugblock":
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        surf.fill((0, 0, 0))
+        # Top-left
+        pygame.draw.rect(surf, (255, 0, 255), (0, 0, size // 2, size // 2))
+        # Bottom-right
+        pygame.draw.rect(surf, (255, 0, 255), (size // 2, size // 2, size // 2, size // 2))
+        return surf
+
 
     filename = f"{name}.png"
     if os.path.exists(filename):
@@ -373,18 +386,31 @@ def load_texture(name, fallback_color, size, override=None, stfu=False):
             print(f"[WARN] Failed to load {filename}: {e}") if not stfu else None
     print(f"[WARN] Texture '{filename}' not found, using solid color.") if not stfu else None
     surf = pygame.Surface((size, size if override is None else override), pygame.SRCALPHA)
-    surf.fill(fallback_color)
+    # Old: fill with fallback color
+    # New: classic error texture
+    surf.fill((0, 0, 0))
+    w = size
+    h = size if override is None else override
+    # Top-left
+    pygame.draw.rect(surf, (255, 0, 255), (0, 0, w // 2, h // 2))
+    # Bottom-right
+    pygame.draw.rect(surf, (255, 0, 255), (w // 2, h // 2, w // 2, h // 2))
+    if override_override:
+        surf.fill(fallback_color)
     return surf
 
 tile_textures = {}
 for tile in TILES.tileinstances.values():
     texname = f"tile_{tile.name.lower()}"
-    tile_textures[tile.id] = load_texture(texname, tile.color, TILE_SIZE, stfu=True if texname == "tile_air" else False)
+    tile_textures[tile.id] = load_texture(texname, tile.color, TILE_SIZE, stfu=True if texname == "tile_air" else False, override_override=texname== "tile_air")
 
 item_textures = {}
 for item in ITEMS.iteminstances.values():
     texname = f"item_{item.name.lower()}"
-    item_textures[item.id] = load_texture(texname, (200, 200, 200), TILE_SIZE)
+    if os.path.exists(texname + ".png"):
+        item_textures[item.id] = load_texture(texname, (200, 200, 200), TILE_SIZE)
+    else:
+        item_textures[item.id] = load_texture("tile_" + item.name.lower(), (200, 200, 200), TILE_SIZE)
 
 # Player texture (example, you can customize)
 player_texture = load_texture("player", (255, 0, 0), TILE_SIZE * PLAYER_WIDTH, override=TILE_SIZE * PLAYER_HEIGHT)
@@ -488,6 +514,14 @@ while True:
                 #print(f"You whacked a {Tile_from_id(tile).name} at ({tile_x}, {tile_y})")
                 #print("driosO: " + str(drops.get(Tile_from_id(tile), {})))
                 # Get drops for this tile
+                if tile_id == TILES.LOG:
+                    # Remove left stump if present and facing into this log
+                    if tile_x - 1 >= 0 and grid[tile_x - 1, tile_y] == TILES.LOGSTUMP_LEFT:
+                        grid[tile_x - 1, tile_y] = TILES.AIR
+                    # Remove right stump if present and facing into this log
+                    if tile_x + 1 < GRID_WIDTH and grid[tile_x + 1, tile_y] == TILES.LOGSTUMP_RIGHT:
+                        grid[tile_x + 1, tile_y] = TILES.AIR
+
                 if Tile_from_id(tile_id) in drops:
                     for item, tables in drops[Tile_from_id(tile_id)].items():
                         for drop in tables:
@@ -522,14 +556,98 @@ while True:
                     grid[x + 1, y] = TILES.WATER"""
     
     # UPDATES
-    #new_updates = []
-    #random.shuffle(update)
-    #for x, y in update:
-    #    pass#;tile_id = grid[x, y]
+    new_update = set()
+    for x, y in update:
+        tileid = grid[x, y]
+        tileobj = Tile_from_id(tileid)
+        if tileid == TILES.LOG:
+            below = grid[x, y + 1] if y + 1 < GRID_HEIGHT else TILES.GRASS
+            if Tile_from_id(below) not in GROWABLE_TILES | {TILES.LOG}:
+                # The log breaks
+                grid[x, y] = TILES.AIR
+                # Drops
+                if TILES.LOG in drops:
+                    for item, tables in drops[TILES.LOG].items():
+                        for drop in tables:
+                            if random.random() < drop["chance"]:
+                                inventory.add_item(item, drop["count"])
+                                #print(f"Inserter: Added item: {item.name} x{drop['count']}")
 
-                
-    #update = new_updates
-    update.clear()  # Reset update list for next frame
+                # Add surrounding tiles to update list
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                            if (nx, ny) not in new_update:
+                                new_update.add((nx, ny))
+                  # --- LEAF SUPPORT CHECK ---
+        # Stumps
+        elif tileid == TILES.LOGSTUMP_LEFT:
+            # check for log on right, if no, remove stump
+            if grid[x + 1, y] != TILES.LOG:
+                grid[x, y] = TILES.AIR
+        elif tileid == TILES.LOGSTUMP_RIGHT:
+            # check for log on left, if no, remove stump
+            if grid[x - 1, y] != TILES.LOG:
+                grid[x, y] = TILES.AIR
+
+
+        elif tileid == TILES.LEAVES:
+            found_log = False
+            for dx in range(-2, 3):
+                for dy in range(-2, 3):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                        if grid[nx, ny] == TILES.LOG:
+                            # Use flood fill to check for a direct path from the log to this leaf, if not, dont count
+                            def ff(smallergrid, sx, sy, ex, ey):
+                                q = [(sx, sy)]
+                                visited = set()
+                                while q:
+                                    cx, cy = q.pop(0)
+                                    if (cx, cy) == (ex, ey):
+                                        return True
+                                    visited.add((cx, cy))
+                                    for dx2 in range(-1, 2):
+                                        for dy2 in range(-1, 2):
+                                            if abs(dx2) + abs(dy2) == 1:
+                                                nx2, ny2 = cx + dx2, cy + dy2
+                                                #if 0 <= nx2 < GRID_WIDTH and 0 <= ny2 < GRID_HEIGHT: # old
+                                                if 0 <= nx2 < smallergrid.shape[0] and 0 <= ny2 < smallergrid.shape[1]: # new
+                                                    if smallergrid[nx2, ny2] == TILES.LEAVES or smallergrid[nx2, ny2] == TILES.LOG:
+                                                        if (nx2, ny2) not in visited:
+                                                            q.append((nx2, ny2))
+                                return False
+                            
+                            # floro dill using  4x4 grid artound leaf
+                            leaf_grid = grid[x-2:x+3, y-2:y+3]
+                            if ff(leaf_grid, 2, 2, 2 + dx, 2 + dy):
+                                found_log = True
+                                break
+                            
+                if found_log:
+                    break
+
+
+
+            if not found_log:
+                # The leaf disintegrates and drops fruit
+                grid[x, y] = TILES.AIR
+                if TILES.LEAVES in drops:
+                    for item, tables in drops[TILES.LEAVES].items():
+                        for drop in tables:
+                            if random.random() < drop["chance"]:
+                                inventory.add_item(item, drop["count"])
+                for dx in range(-1, 2):
+                    for dy in range(-1, 2):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                            if (nx, ny) not in new_update:
+                                new_update.add((nx, ny))
+
+
+
+    update = new_update
                     
             
     # --- Horizontal movement and wall collision ---
@@ -610,23 +728,19 @@ while True:
             gx = int(camera_x + x)
             gy = int(camera_y + y)
             if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
-                tile_id = (tile_obj:=grid[gx, gy])
+                tile_id = grid[gx, gy]
+                tile_obj = Tile_from_id(tile_id)
                 tex = tile_textures.get(tile_id)
                 if tex:
-                    # Get allowed flip/rotate from rotateflip_data
-                    
-                    if tile_obj in rotateflip_data:
-                        #print("rules for the tile: " + ({0: "cannot rotate", 1: "180 only", 2: "any rotation"}[rotateflip_data[tile_id]]) + ", " + {0: "cannot flip", 1: "flip X", 2: "flip Y", 3: "flip both"}[rotateflip_data[tile_id][0]])
+                    if tile_id in precomputed_tile_variants and tile_obj in rotateflip_data:
                         allow_flip, allow_rotate = rotateflip_data[tile_obj]
                         rf = rotateflip_grid[gx, gy]
                         # Rotation
                         rot = 0
                         if allow_rotate == 1:
-                            # Only allow 180 degree rotation
                             if (rf >> 2) & 0b01:
                                 rot = 180
                         elif allow_rotate == 2:
-                            # Allow 0, 90, 180, 270
                             rot = ((rf >> 2) & 0b11) * 90
                         # Flip
                         flipx = False
@@ -638,14 +752,9 @@ while True:
                         elif allow_flip == 3:
                             flipx = bool(rf & 0b0010)
                             flipy = bool(rf & 0b0001)
-                        # Apply transforms
-                        """tex2 = pygame.transform.flip(tex, flipx, flipy)
-                        if rot:
-                            tex2 = pygame.transform.rotate(tex2, rot)"""
                         tex2 = precomputed_tile_variants[tile_id].get((rot, flipx, flipy), tex)
                     else:
                         tex2 = tex
-                        #print("no rules found for tile of type " + str(tile_id))
                     oscreen.blit(
                         tex2,
                         (
@@ -674,6 +783,38 @@ while True:
         )
     )
 
+    # Draw inventory as a row of item icons with counts
+    font = pygame.font.Font(None, 24)
+    spacing = 8
+    x_offset = 10
+    y_offset = 10
+    # Draw a transparant bg for the bar (calculate based on amount of items)
+    inventory_width = len(inventory.get_all_items()) * (32 + spacing) - spacing
+    if inventory_width < 0: inventory_width = 0
+    transparancy_surface = pygame.Surface((inventory_width + 16, 32 + 16), pygame.SRCALPHA)
+    transparancy_surface.fill((0, 0, 0, 128))  # semi-transparent black
+    if len(inventory.get_all_items()) != 0:
+        screen.blit(transparancy_surface, (SCREEN_WIDTH / 2 - inventory_width / 2 - 12, SCREEN_HEIGHT - 32 - 10 - 8))
+    for idx, (item, count) in enumerate(inventory.get_all_items().items()):
+        # Start at (SCREEN_WIDTH / 2 - (len(inventory.get_all_items()) * (TILE_SIZE + spacing) / 2), SCREEN_HEIGHT - TILE_SIZE - 10)
+        """item_x = x_offset + idx * (TILE_SIZE + spacing)
+        item_y = y_offset""" # THIS IS FUCKING NOT AT ALL LIKE WHAT ISAID IN THE OCMMENT. WRONG!!!!!!!!
+        item_x = SCREEN_WIDTH / 2 - (len(inventory.get_all_items()) * (32 + spacing) / 2) + idx * (32 + spacing)
+        item_y = SCREEN_HEIGHT - 32 - 10
+        item_texture = item_textures.get(item.id)
+        if item_texture:
+            screen.blit(pygame.transform.scale(item_texture, (32, 32)), (item_x, item_y))
+            count_text = font.render(f"x{count}", True, (255, 255, 255))
+            screen.blit(count_text, (item_x + 32 - count_text.get_width(), item_y + 32 - count_text.get_height()))
+
+
+    if commandconsole:
+        pygame.draw.rect(screen, (0, 0, 0, 128), (0, SCREEN_HEIGHT-50, 200, 48))
+        font = pygame.font.Font(None, 24)
+        input_surface = font.render(input_text, True, (255, 255, 255))
+        screen.blit(input_surface, (10, SCREEN_HEIGHT-40))
+
+
     # DEEBUG
     if f3:
         fps = clock.get_fps()
@@ -692,12 +833,6 @@ while True:
         # Draw inventory liek this: Inventory: A x1, B x2, C x3
         inventory_text = font.render(f"Inventory: " + ", ".join(f"{item.name} x{count}" for item, count in inventory.get_all_items().items()), True, (255, 255, 255))
         screen.blit(inventory_text, (10, 70))
-
-    if commandconsole:
-        pygame.draw.rect(screen, (0, 0, 0, 128), (0, SCREEN_HEIGHT-50, 200, 48))
-        font = pygame.font.Font(None, 24)
-        input_surface = font.render(input_text, True, (255, 255, 255))
-        screen.blit(input_surface, (10, SCREEN_HEIGHT-40))
 
 
     deltarune = 60 / clock.get_fps() if clock.get_fps() > 0 else 60 # deltatime
