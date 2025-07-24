@@ -178,6 +178,14 @@ for x in range(GRID_WIDTH):
             break  # Only one tree per column
         
 
+# After generating grid:
+tile_obj_grid = np.empty((GRID_WIDTH, GRID_HEIGHT), dtype=object)
+for x in range(GRID_WIDTH):
+    for y in range(GRID_HEIGHT):
+        tile_obj_grid[x, y] = speed[grid[x, y]]
+
+
+
 def Tile_from_name(tile_name):
     if tile_name in TILES.tileinstances:
         return TILES.tileinstances[tile_name]
@@ -187,7 +195,7 @@ def Tile_from_name(tile_name):
 center_x = GRID_WIDTH // 2
 stone_y = 0
 for y in range(0, GRID_HEIGHT, 1): # Fixed: positive step size 1
-    if Tile_from_id(grid[center_x, y]).solid:
+    if tile_obj_grid[center_x, y].solid:
         stone_y = y
         break
 
@@ -227,7 +235,7 @@ clock = pygame.time.Clock()
 # Check horizontal collisions at all 4 corners
 def is_solid_at(x, y):
     if 0 <= int(x) < GRID_WIDTH and 0 <= int(y) < GRID_HEIGHT:
-        return Tile_from_id(grid[int(x), int(y)]).solid
+        return tile_obj_grid[int(x), int(y)].solid
     return False
 
 
@@ -522,8 +530,8 @@ while True:
                     if tile_x + 1 < GRID_WIDTH and grid[tile_x + 1, tile_y] == TILES.LOGSTUMP_RIGHT:
                         grid[tile_x + 1, tile_y] = TILES.AIR
 
-                if Tile_from_id(tile_id) in drops:
-                    for item, tables in drops[Tile_from_id(tile_id)].items():
+                if tile_obj_grid[tile_x, tile_y] in drops:
+                    for item, tables in drops[tile_obj_grid[tile_x, tile_y]].items():
                         for drop in tables:
                             #print("drop: " + str(drop))
                             if random.random() < drop["chance"]:
@@ -559,10 +567,10 @@ while True:
     new_update = set()
     for x, y in update:
         tileid = grid[x, y]
-        tileobj = Tile_from_id(tileid)
+        tileobj = tile_obj_grid[x, y]
         if tileid == TILES.LOG:
             below = grid[x, y + 1] if y + 1 < GRID_HEIGHT else TILES.GRASS
-            if Tile_from_id(below) not in GROWABLE_TILES | {TILES.LOG}:
+            if tile_obj_grid[x, y + 1] not in GROWABLE_TILES | {TILES.LOG}:
                 # The log breaks
                 grid[x, y] = TILES.AIR
                 # Drops
@@ -729,7 +737,7 @@ while True:
             gy = int(camera_y + y)
             if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
                 tile_id = grid[gx, gy]
-                tile_obj = Tile_from_id(tile_id)
+                tile_obj = tile_obj_grid[gx, gy]
                 tex = tile_textures.get(tile_id)
                 if tex:
                     if tile_id in precomputed_tile_variants and tile_obj in rotateflip_data:
