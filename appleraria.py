@@ -228,7 +228,7 @@ pygame.init()
 player_vx = 0
 player_vy = 0
 update = {(1,1)} # (x, y)
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.DOUBLEBUF | pygame.HWSURFACE)
 pygame.display.set_caption('Appleraria')
 pygame.display.set_icon(pygame.image.load("icon.png")) # Apple icon!!!
 clock = pygame.time.Clock()
@@ -387,7 +387,7 @@ def load_texture(name, fallback_color, size, override=None, stfu=False, override
     filename = f"{name}.png"
     if os.path.exists(filename):
         try:
-            img = pygame.image.load(filename).convert_alpha()
+            img = pygame.image.load(filename).convert()
             img = pygame.transform.scale(img, (size, size if override is None else override))
             return img
         except Exception as e:
@@ -455,7 +455,7 @@ for tile in TILES.tileinstances.values():
                 tex2 = pygame.transform.flip(tex, flipx, flipy)
                 if rot:
                     tex2 = pygame.transform.rotate(tex2, rot)
-                variants[key] = tex2
+                variants[key] = tex2.convert() # convert
         precomputed_tile_variants[tile.id] = variants
 
 # ...existing code...
