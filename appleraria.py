@@ -32,7 +32,7 @@ class Tile:
         return False
     
     def __hash__(self):
-        return hash(self.id)
+        return self.id # the id is already unique for each block, so no need to use hash()
 
 class Tiles:
     def __init__(self, tile_dict):
@@ -569,8 +569,8 @@ while True:
         tileid = grid[x, y]
         tileobj = tile_obj_grid[x, y]
         if tileid == TILES.LOG:
-            below = grid[x, y + 1] if y + 1 < GRID_HEIGHT else TILES.GRASS
-            if tile_obj_grid[x, y + 1] not in GROWABLE_TILES | {TILES.LOG}:
+            below_id = grid[x, y + 1] if y + 1 < GRID_HEIGHT else TILES.GRASS.id
+            if below_id not in {TILES.GRASS.id, TILES.DIRT.id, TILES.LOG.id}:
                 # The log breaks
                 grid[x, y] = TILES.AIR
                 # Drops
